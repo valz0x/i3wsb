@@ -17,10 +17,15 @@ internal sealed class DockForm : Form
     const int Pad = 10;
     const int BarPad = 8;
 
+    const string ClockFormat = "yyyy-MM-dd  HH:mm:ss";
+
     readonly Vda _vda;
     readonly ToolTip _tip = new() { ShowAlways = true, InitialDelay = 250, ReshowDelay = 100 };
     readonly Font _barFont = new("Consolas", 10f);
+    readonly System.Windows.Forms.Timer _clockTimer = new() { Interval = 1000 };
     AppBar? _appBar;
+    Rectangle _clockRect;
+    int _clockWidth;
 
     // clickable regions for the active view; index-aligned with _apps (Icons) or _segs (Bar)
     readonly List<Rectangle> _rects = new();
@@ -77,6 +82,13 @@ internal sealed class DockForm : Form
         var wa = Screen.PrimaryScreen!.WorkingArea;
         Location = new Point(wa.Left + 12, wa.Top + 12);
         Size = new Size(Pad * 2 + IconSize, Pad * 2 + IconSize);
+
+        _clockTimer.Tick += (_, _) =>
+        {
+            if (_view != DockView.Bar || !Visible) return;
+            if (_clockRect.IsEmpty) Invalidate(); else Invalidate(_clockRect);
+        };
+        _clockTimer.Start();
     }
 
     protected override CreateParams CreateParams
@@ -183,7 +195,12 @@ internal sealed class DockForm : Form
             }
         }
 
-        ApplyGeometry(x + BarPad, h, rounded: false);
+        // reserve room for the right-aligned clock (drawn against the real
+        // window edge in PaintBar, so it works anchored or floating)
+        _clockWidth = MeasureW(g, DateTime.Now.ToString(ClockFormat)) + 2;
+        int floatW = x + BarPad + 24 + _clockWidth + BarPad;
+
+        ApplyGeometry(floatW, h, rounded: false);
     }
 
     /// <summary>Place the window: full-width at the top edge when anchored,
@@ -277,6 +294,7 @@ internal sealed class DockForm : Form
     static readonly Color UsedFg = Color.FromArgb(0xCC, 0xCC, 0xCC);
     static readonly Color EmptyFg = Color.FromArgb(0x80, 0x80, 0x80);
     static readonly Color SepFg = Color.FromArgb(0x55, 0x55, 0x55);
+    static readonly Color ClockFg = Color.FromArgb(0xD0, 0xD0, 0xD0);
 
     void PaintBar(Graphics g)
     {
@@ -297,6 +315,12 @@ internal sealed class DockForm : Form
 
         foreach (var (rect, text) in _seps)
             TextRenderer.DrawText(g, text, _barFont, rect, SepFg, fmt);
+
+        // right section: date + time
+        int w = Math.Max(_clockWidth, 1);
+        _clockRect = new Rectangle(ClientRectangle.Right - w - BarPad, BarPad, w, _barFont.Height);
+        TextRenderer.DrawText(g, DateTime.Now.ToString(ClockFormat), _barFont, _clockRect, ClockFg,
+            TextFormatFlags.NoPadding | TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
     }
 
     // ---- interaction --------------------------------------------------
@@ -409,6 +433,7 @@ internal sealed class DockForm : Form
 
     protected override void OnHandleDestroyed(EventArgs e)
     {
+        _clockTimer.Stop();
         _appBar?.Unregister();   // release the reserved work area
         base.OnHandleDestroyed(e);
     }

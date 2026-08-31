@@ -1,14 +1,15 @@
 # i3wsb — an i3-style workspace bar for Windows
 
-A thin always-on-top bar that shows every Windows 11 **virtual desktop** and the
-apps on it, i3-style, and switches between them with the keyboard:
+[![build](https://github.com/torrex-v/i3wsb/actions/workflows/build.yml/badge.svg)](https://github.com/torrex-v/i3wsb/actions/workflows/build.yml)
+&nbsp;·&nbsp; Windows 11 &nbsp;·&nbsp; .NET 10 &nbsp;·&nbsp; MIT
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│  1 [firefox-code]  │  2 [term]  │ ▐ 3 [slack-notion] ▌ │  4 []          │
-└────────────────────────────────────────────────────────────────────────┘
-        (workspace 3 is focused — highlighted block)
-```
+A thin always-on-top bar that shows every Windows 11 **virtual desktop** and the
+apps on it, i3-style, and switches between them with the keyboard.
+
+![i3wsb](docs/i3wsb.png)
+
+*`1 [firefox-code] | 2 [term] | 3 [slack] | 4 []` — the focused desktop is
+highlighted, its apps listed by name; date + time on the right.*
 
 - **`Win`+`1..4`** jumps to a desktop, **`Win`+`Shift`+`1..4`** throws the active
   window there. (Windows normally eats `Win`+number for the taskbar — see
@@ -16,6 +17,7 @@ apps on it, i3-style, and switches between them with the keyboard:
 - Anchored to the top edge as a real **AppBar**, so maximized and snapped
   windows get pushed down instead of hiding under it — a proper i3 strut.
 - Click a segment to switch. Hover for the full window titles.
+- Right section shows the **date and time**, ticking every second.
 - Auto-hides while a fullscreen app (a game, a video) is in front.
 
 There's also an optional **icon-dock view** (a mac-style strip of the current

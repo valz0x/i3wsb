@@ -1,6 +1,7 @@
 # i3wsb — an i3-style workspace bar for Windows
 
 [![build](https://github.com/torrex-v/i3wsb/actions/workflows/build.yml/badge.svg)](https://github.com/torrex-v/i3wsb/actions/workflows/build.yml)
+[![latest release](https://img.shields.io/github/v/release/torrex-v/i3wsb?sort=semver)](https://github.com/torrex-v/i3wsb/releases/latest)
 &nbsp;·&nbsp; Windows 11 &nbsp;·&nbsp; .NET 10 &nbsp;·&nbsp; MIT
 
 A thin always-on-top bar that shows every Windows 11 **virtual desktop** and the
@@ -23,15 +24,22 @@ highlighted, its apps listed by name; date + time on the right.*
 There's also an optional **icon-dock view** (a mac-style strip of the current
 desktop's app icons) if you prefer that — toggle with `Ctrl`+`Alt`+`S`.
 
-## Requirements
+## Install
 
-- **Windows 11** (needs the current virtual-desktop COM API; recent builds only)
-- **[.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)**
-  to run a framework-dependent build, or build self-contained (below)
-- `VirtualDesktopAccessor.dll` next to the exe — **bundled in this repo**
-  (see [THIRD_PARTY.md](THIRD_PARTY.md))
+**Download** the latest `i3wsb-vX.Y.Z-win-x64.zip` from the
+**[Releases](https://github.com/torrex-v/i3wsb/releases/latest)** page, unzip it
+anywhere, and run `i3wsb.exe`. It's a self-contained build — no .NET install
+needed. Keep `VirtualDesktopAccessor.dll` in the same folder.
 
-## Build & run
+Requires **Windows 11** (a recent build — the virtual-desktop COM API changes
+between releases).
+
+To start it with Windows, drop a shortcut to `i3wsb.exe` into `shell:startup`
+(`Win`+`R` → type `shell:startup`).
+
+### Build from source
+
+Needs the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 ```powershell
 git clone https://github.com/torrex-v/i3wsb.git
@@ -40,17 +48,8 @@ dotnet build -c Release
 .\bin\Release\net10.0-windows\i3wsb.exe
 ```
 
-Single self-contained exe (no runtime install needed):
-
-```powershell
-dotnet publish -c Release -r win-x64 --self-contained `
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
-```
-
-`VirtualDesktopAccessor.dll` is copied next to the output automatically.
-
-To start it with Windows, drop a shortcut to `i3wsb.exe` in
-`shell:startup` (`Win`+`R` → `shell:startup`).
+The same self-contained zip the Releases page ships is produced by
+`.github/workflows/release.yml` on every `v*` tag.
 
 ## Hotkeys
 

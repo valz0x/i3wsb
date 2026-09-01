@@ -1,0 +1,58 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Build, publish, package
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag || github.ref_name }}"
+          $ver = $tag.TrimStart('v')
+          Write-Host "Building $tag ($ver)"
+
+          dotnet publish -c Release -r win-x64 --self-contained `
+            -p:PublishSingleFile=true `
+            -p:Version=$ver `
+            -o publish --nologo
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          $files = "i3wsb.exe", "VirtualDesktopAccessor.dll", "README.md", "LICENSE", "THIRD_PARTY.md"
+          Copy-Item README.md, LICENSE, THIRD_PARTY.md publish/
+          foreach ($f in $files) {
+            if (-not (Test-Path "publish/$f")) { throw "missing publish/$f" }
+          }
+          $zip = "i3wsb-$tag-win-x64.zip"
+          Compress-Archive -Path ($files | ForEach-Object { "publish/$_" }) -DestinationPath $zip -Force
+          Get-ChildItem publish, $zip | Format-Table Name, Length
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: i3wsb-*-win-x64.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          body: |
+            Self-contained build — no .NET runtime install needed.
+
+            **Run:** unzip anywhere, launch `i3wsb.exe`. Keep `VirtualDesktopAccessor.dll` next to it.
+            **Requires:** Windows 11 (recent build) x64.

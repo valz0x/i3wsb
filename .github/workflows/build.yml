@@ -17,17 +17,3 @@ jobs:
           dotnet-version: "10.0.x"
 
       - run: dotnet build -c Release --nologo
-
-      - name: Publish self-contained exe
-        run: >
-          dotnet publish -c Release -r win-x64 --self-contained
-          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
-          -o publish --nologo
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: i3wsb-win-x64
-          path: |
-            publish/i3wsb.exe
-            publish/VirtualDesktopAccessor.dll
-          if-no-files-found: error

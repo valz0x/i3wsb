@@ -2,12 +2,13 @@ name: release
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to build (e.g. v0.1.0)"
-        required: true
+        description: "Tag to build (e.g. v0.2.0)"
+        required: false
 
 permissions:
   contents: write
@@ -25,9 +26,23 @@ jobs:
       - name: Build, publish, package
         shell: pwsh
         run: |
-          $tag = "${{ github.event.inputs.tag || github.ref_name }}"
+          $inputTag = "${{ github.event.inputs.tag }}"
+          $refName = "${{ github.ref_name }}"
+
+          if ($inputTag) {
+            $tag = $inputTag
+          } elseif ($refName -like "v*") {
+            $tag = $refName
+          } else {
+            [xml]$proj = Get-Content i3wsb.csproj
+            $v = $proj.Project.PropertyGroup.Version
+            if (-not $v) { $v = "0.2.0" }
+            $tag = "v$v"
+          }
+
           $ver = $tag.TrimStart('v')
           Write-Host "Building $tag ($ver)"
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
 
           dotnet publish -c Release -r win-x64 --self-contained `
             -p:PublishSingleFile=true `
@@ -46,8 +61,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: i3wsb ${{ env.RELEASE_TAG }}
           files: i3wsb-*-win-x64.zip
           generate_release_notes: true
           fail_on_unmatched_files: true

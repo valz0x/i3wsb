@@ -11,10 +11,11 @@
     <AssemblyName>i3wsb</AssemblyName>
     <RootNamespace>I3wsb</RootNamespace>
     <Product>i3 Workspace Bar for Windows</Product>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);WFO1000</NoWarn>
 
     <!-- release: self-contained single file, compressed, no pdb -->
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>

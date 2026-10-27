@@ -7,7 +7,7 @@ internal readonly record struct AppWindow(IntPtr Hwnd, string Title, string ExeP
 /// <summary>Enumerates "real" top-level windows, the same set the taskbar shows.</summary>
 internal static class TaskbarWindows
 {
-    public static List<AppWindow> Enumerate()
+    public static List<AppWindow> Enumerate(bool includeOtherDesktops = true)
     {
         var result = new List<AppWindow>();
         IntPtr self = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
@@ -15,7 +15,15 @@ internal static class TaskbarWindows
         Native.EnumWindows((hwnd, _) =>
         {
             if (!Native.IsWindowVisible(hwnd)) return true;
-            if (Native.IsCloaked(hwnd)) return true;                 // hidden on another desktop
+
+            int cloaked = Native.GetCloakedState(hwnd);
+            if (cloaked != 0)
+            {
+                // DWM_CLOAKED_SHELL (2) means the window is on another virtual desktop.
+                // Include it if includeOtherDesktops is true so we can track windows across desktops.
+                if (!includeOtherDesktops || cloaked != Native.DWM_CLOAKED_SHELL)
+                    return true;
+            }
 
             string title = Native.GetTitle(hwnd);
             if (title.Length == 0) return true;
@@ -54,7 +62,7 @@ internal static class TaskbarWindows
         try
         {
             var info = new Native.SHFILEINFO();
-            uint flags = Native.SHGFI_ICON | Native.SHGFI_LARGEICON;
+            uint flags = Native.SHGFI_ICON | (size <= 24 ? Native.SHGFI_SMALLICON : Native.SHGFI_LARGEICON);
             IntPtr r = Native.SHGetFileInfoW(exePath, 0, ref info, (uint)System.Runtime.InteropServices.Marshal.SizeOf<Native.SHFILEINFO>(), flags);
             if (r != IntPtr.Zero && info.hIcon != IntPtr.Zero)
             {

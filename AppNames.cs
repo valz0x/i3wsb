@@ -1,10 +1,10 @@
 namespace I3wsb;
 
 /// <summary>Short, lowercase app identifiers for the workspace-bar view
-/// ("brave", "code", "term") — matches the AutoHotkey script's scheme.</summary>
+/// ("edge", "code", "term") — clean and readable.</summary>
 internal static class AppNames
 {
-    const int MaxLen = 16;
+    const int MaxLen = 14;
 
     static readonly Dictionary<string, string> Overrides = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -12,12 +12,28 @@ internal static class AppNames
         ["Code"] = "code",
         ["WindowsTerminal"] = "term",
         ["wt"] = "term",
+        ["powershell"] = "pwsh",
+        ["pwsh"] = "pwsh",
+        ["cmd"] = "cmd",
         ["explorer"] = "files",
         ["devenv"] = "vs",
         ["idea64"] = "idea",
         ["pycharm64"] = "pycharm",
+        ["clion64"] = "clion",
+        ["rider64"] = "rider",
+        ["webstorm64"] = "webstorm",
         ["totalcmd64"] = "tc",
         ["totalcmd"] = "tc",
+        ["chrome"] = "chrome",
+        ["firefox"] = "firefox",
+        ["brave"] = "brave",
+        ["slack"] = "slack",
+        ["discord"] = "discord",
+        ["spotify"] = "spotify",
+        ["notepad"] = "notes",
+        ["sublime_text"] = "sublime",
+        ["obsidian"] = "obsidian",
+        ["telegram"] = "tg",
     };
 
     public static string Short(string exePath, string title)
@@ -40,7 +56,7 @@ internal static class AppNames
         return name.Length > MaxLen ? name[..MaxLen] : name;
     }
 
-    /// <summary>Deduplicated, hyphen-joined names for a desktop's windows.</summary>
+    /// <summary>Deduplicated, space-bullet joined names for a desktop's windows.</summary>
     public static string Label(IEnumerable<AppWindow> windows)
     {
         var seen = new HashSet<string>();
@@ -50,7 +66,7 @@ internal static class AppNames
             string n = Short(w.ExePath, w.Title);
             if (seen.Add(n)) parts.Add(n);
         }
-        return string.Join("-", parts);
+        return string.Join(" ", parts);
     }
 
     static string FirstWord(string s)

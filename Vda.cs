@@ -28,6 +28,7 @@ internal sealed class Vda
 
     public bool Loaded { get; }
     public bool CanCreate => _createDesktop != null;
+    public bool CanRemove => _removeDesktop != null;
 
     public Vda()
     {
@@ -62,7 +63,16 @@ internal sealed class Vda
     {
         if (_createDesktop == null || _getCount == null) return;
         int count = _getCount();
-        while (count > 0 && count <= index) { _createDesktop(); count++; }
+        int attempts = 0;
+        while (count > 0 && count <= index && attempts < 10)
+        {
+            _createDesktop();
+            attempts++;
+            System.Threading.Thread.Sleep(20);
+            int newCount = _getCount();
+            if (newCount > count) count = newCount;
+            else count++;
+        }
     }
 
     public void GoTo(int index)
@@ -86,4 +96,33 @@ internal sealed class Vda
 
     /// <summary>0-based desktop a window lives on, or -1 if unknown / pinned.</summary>
     public int WindowDesktop(IntPtr hWnd) => _windowDesktop?.Invoke(hWnd) ?? -1;
+
+    public bool RemoveDesktop(int index, int fallback = 0)
+    {
+        if (_removeDesktop == null) return false;
+        return _removeDesktop(index, fallback) != 0;
+    }
+
+    /// <summary>
+    /// Removes trailing empty virtual desktops beyond desktop 0 that are not currently active.
+    /// </summary>
+    public void PruneTrailingEmptyDesktops(HashSet<int> occupied)
+    {
+        if (_removeDesktop == null || _getCount == null) return;
+        int count = _getCount();
+        int current = CurrentDesktop;
+
+        for (int d = count - 1; d > 0; d--)
+        {
+            if (d == current) break;
+            if (!occupied.Contains(d))
+            {
+                _removeDesktop(d, Math.Min(current, d - 1));
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
 }

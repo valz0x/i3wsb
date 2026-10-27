@@ -2,8 +2,10 @@ using System.Runtime.InteropServices;
 
 namespace I3wsb;
 
+public enum BarEdge { Top, Bottom }
+
 /// <summary>
-/// Registers the overlay window as a Windows AppBar docked to the top edge, so
+/// Registers the overlay window as a Windows AppBar docked to top or bottom edge, so
 /// the shell shrinks everyone else's work area — maximized / snapped windows
 /// get pushed down instead of sliding under the bar (i3 strut behaviour).
 ///
@@ -17,12 +19,27 @@ internal sealed class AppBar
     readonly IntPtr _hwnd;
     bool _registered;
     int _height;
+    BarEdge _edge = BarEdge.Top;
 
     public AppBar(IntPtr hwnd) => _hwnd = hwnd;
 
-    public void EnsureRegistered(int height)
+    public BarEdge Edge
+    {
+        get => _edge;
+        set
+        {
+            if (_edge != value)
+            {
+                _edge = value;
+                Reposition();
+            }
+        }
+    }
+
+    public void EnsureRegistered(int height, BarEdge edge = BarEdge.Top)
     {
         _height = Math.Max(height, 1);
+        _edge = edge;
         if (!_registered)
         {
             var d = New();
@@ -70,12 +87,22 @@ internal sealed class AppBar
         Native.RECT mon = MonitorRect();
 
         var d = New();
-        d.uEdge = Native.ABE_TOP;
-        d.rc = new Native.RECT { Left = mon.Left, Top = mon.Top, Right = mon.Right, Bottom = mon.Top + _height };
-        Native.SHAppBarMessage(Native.ABM_QUERYPOS, ref d);   // shell may push .Top down past other appbars
-        d.rc.Bottom = d.rc.Top + _height;
-        Native.SHAppBarMessage(Native.ABM_SETPOS, ref d);
+        d.uEdge = _edge == BarEdge.Bottom ? Native.ABE_BOTTOM : Native.ABE_TOP;
 
+        if (_edge == BarEdge.Bottom)
+        {
+            d.rc = new Native.RECT { Left = mon.Left, Top = mon.Bottom - _height, Right = mon.Right, Bottom = mon.Bottom };
+            Native.SHAppBarMessage(Native.ABM_QUERYPOS, ref d);
+            d.rc.Top = d.rc.Bottom - _height;
+        }
+        else
+        {
+            d.rc = new Native.RECT { Left = mon.Left, Top = mon.Top, Right = mon.Right, Bottom = mon.Top + _height };
+            Native.SHAppBarMessage(Native.ABM_QUERYPOS, ref d);
+            d.rc.Bottom = d.rc.Top + _height;
+        }
+
+        Native.SHAppBarMessage(Native.ABM_SETPOS, ref d);
         Native.MoveWindow(_hwnd, d.rc.Left, d.rc.Top, d.rc.Right - d.rc.Left, d.rc.Bottom - d.rc.Top, true);
     }
 

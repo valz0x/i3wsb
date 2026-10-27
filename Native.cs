@@ -36,6 +36,19 @@ internal static class Native
 
     public const uint GW_OWNER = 4;
 
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
+
+    public const uint GA_PARENT = 1;
+    public const uint GA_ROOT = 2;
+    public const uint GA_ROOTOWNER = 3;
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetShellWindow();
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetDesktopWindow();
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern int GetWindowLongW(IntPtr hWnd, int index);
 
@@ -68,6 +81,21 @@ internal static class Native
     public static extern int DwmGetWindowAttribute(IntPtr hWnd, int attr, out int value, int size);
 
     public const int DWMWA_CLOAKED = 14;
+    public const int DWM_CLOAKED_APP = 1;
+    public const int DWM_CLOAKED_SHELL = 2; // Cloaked by Shell = on another virtual desktop
+    public const int DWM_CLOAKED_INHERITED = 4;
+
+    public static int GetCloakedState(IntPtr hWnd)
+    {
+        if (DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out int v, sizeof(int)) == 0)
+            return v;
+        return 0;
+    }
+
+    public static bool IsCloaked(IntPtr hWnd)
+    {
+        return GetCloakedState(hWnd) != 0;
+    }
 
     // ---- Process path -----------------------------------------------------
 
@@ -126,6 +154,7 @@ internal static class Native
     public const uint ABM_SETPOS = 3;
     public const uint ABM_WINDOWPOSCHANGED = 9;
     public const uint ABE_TOP = 1;
+    public const uint ABE_BOTTOM = 3;
     public const int ABN_POSCHANGED = 1;
 
     // ---- Global hotkeys -------------------------------------------------
@@ -208,9 +237,58 @@ internal static class Native
         return sb.ToString();
     }
 
-    public static bool IsCloaked(IntPtr hWnd)
+    // ---- Taskbar Flashing ------------------------------------------------
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SystemParametersInfoW(uint uiAction, uint uiParam, IntPtr pvParam, uint fWinIni);
+
+    public const uint SPI_SETFOREGROUNDFLASHCOUNT = 0x2005;
+    public const uint SPIF_UPDATEINIFILE = 0x01;
+    public const uint SPIF_SENDCHANGE = 0x02;
+
+    public static void SetTaskbarFlashing(bool enabled)
     {
-        // Windows on other virtual desktops report themselves cloaked.
-        return DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out int v, sizeof(int)) == 0 && v != 0;
+        try
+        {
+            uint count = enabled ? 7u : 0u;
+            SystemParametersInfoW(SPI_SETFOREGROUNDFLASHCOUNT, count, IntPtr.Zero, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop", true);
+            key?.SetValue("ForegroundFlashCount", (int)count, Microsoft.Win32.RegistryValueKind.DWord);
+        }
+        catch { /* best effort */ }
+    }
+
+    public static bool IsTaskbarFlashingDisabled()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop", false);
+            object? val = key?.GetValue("ForegroundFlashCount");
+            if (val is int i) return i == 0;
+            if (val is string s && int.TryParse(s, out int parsed)) return parsed == 0;
+        }
+        catch { }
+        return false;
+    }
+
+    public static void SetDisabledHotkeys(bool disable)
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", true);
+            if (key != null)
+            {
+                if (disable)
+                {
+                    object? cur = key.GetValue("DisabledHotkeys");
+                    if (cur is not string s || !s.Contains("123456789"))
+                    {
+                        key.SetValue("DisabledHotkeys", "123456789", Microsoft.Win32.RegistryValueKind.String);
+                    }
+                }
+            }
+        }
+        catch { /* best effort */ }
     }
 }

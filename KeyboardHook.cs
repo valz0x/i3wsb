@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Windows.Forms;
 
 namespace I3wsb;
 
@@ -16,7 +15,9 @@ internal sealed class KeyboardHook : IDisposable
 {
     const int WH_KEYBOARD_LL = 13;
     const int WM_KEYDOWN = 0x0100;
+    const int WM_KEYUP = 0x0101;
     const int WM_SYSKEYDOWN = 0x0104;
+    const int WM_SYSKEYUP = 0x0105;
 
     const int VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_MENU = 0x12;
     const int VK_LWIN = 0x5B, VK_RWIN = 0x5C;
@@ -41,12 +42,19 @@ internal sealed class KeyboardHook : IDisposable
 
     readonly HookProc _proc;   // kept alive for the lifetime of the hook
     IntPtr _hook;
+    readonly HashSet<int> _swallowedKeys = new();
 
     readonly HotkeyWindow _sink;
     public SuperKey Super { get; set; }
 
     // action ids (match Program's OnHotkey)
-    const int GoBase = 1, MoveBase = 11, ToggleDock = 20, ToggleTop = 21, ToggleAutoHide = 22, ToggleView = 23, Slots = 4;
+    public const int GoBase = 1;        // 1..9   -> desktop 0..8
+    public const int MoveBase = 11;     // 11..19 -> move active to desktop 0..8
+    public const int ToggleDock = 30;
+    public const int ToggleTop = 31;
+    public const int ToggleAutoHide = 32;
+    public const int ToggleView = 33;
+    public const int DesktopSlots = 9;
 
     public KeyboardHook(HotkeyWindow sink, SuperKey super)
     {
@@ -61,15 +69,25 @@ internal sealed class KeyboardHook : IDisposable
         if (code >= 0)
         {
             int msg = wParam.ToInt32();
+            var kb = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
+            int vk = (int)kb.vkCode;
+
             if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)
             {
-                var kb = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
-                int id = Translate((int)kb.vkCode, out bool superUsed);
+                int id = Translate(vk, out bool superUsed);
                 if (id != 0)
                 {
+                    _swallowedKeys.Add(vk);
                     _sink.Post(id);
                     if (superUsed && Super == SuperKey.Win) NeutralizeWinKey();
-                    return (IntPtr)1;   // swallow
+                    return (IntPtr)1;   // swallow keydown
+                }
+            }
+            else if (msg == WM_KEYUP || msg == WM_SYSKEYUP)
+            {
+                if (_swallowedKeys.Remove(vk))
+                {
+                    return (IntPtr)1;   // swallow keyup so Windows shell doesn't trigger taskbar shortcuts
                 }
             }
         }
@@ -87,11 +105,11 @@ internal sealed class KeyboardHook : IDisposable
         bool win = Down(VK_LWIN) || Down(VK_RWIN);
         bool super = Super == SuperKey.Alt ? alt : win;
 
-        int digit = vk is >= 0x31 and <= 0x34 ? vk - 0x31
-                  : vk is >= 0x61 and <= 0x64 ? vk - 0x61   // numpad 1..4
+        int digit = vk is >= 0x31 and <= 0x39 ? vk - 0x31
+                  : vk is >= 0x61 and <= 0x69 ? vk - 0x61   // numpad 1..9
                   : -1;
 
-        if (super && digit >= 0 && !ctrl)
+        if (super && digit >= 0 && digit < DesktopSlots && !ctrl)
         {
             superUsed = true;
             return (shift ? MoveBase : GoBase) + digit;

@@ -10,6 +10,10 @@ internal static class Program
     static Config _config = null!;
     static KeyboardHook _hook = null!;
     static readonly Dictionary<int, IntPtr> _lastActive = new();
+    static Native.WinEventDelegate? _foregroundHookDelegate;
+    static IntPtr _foregroundHook = IntPtr.Zero;
+    static NotifyIcon? _tray;
+    static Icon? _appIcon;
 
     const int GoBase = KeyboardHook.GoBase;          // 1..9  -> desktop 0..8
     const int MoveBase = KeyboardHook.MoveBase;      // 11..19
@@ -66,25 +70,36 @@ internal static class Program
         sink.Pressed += OnHotkey;
         _hook = new KeyboardHook(sink, _config.Super);
 
-        Icon appIcon = TrayIconGenerator.CreateAppIcon();
-        using var tray = new NotifyIcon
+        _appIcon = TrayIconGenerator.CreateAppIcon();
+        _tray = new NotifyIcon
         {
-            Icon = appIcon,
+            Icon = _appIcon,
             Visible = true,
             Text = _vda.Loaded ? "i3wsb — Workspace Bar" : "i3wsb (VirtualDesktopAccessor.dll not loaded)",
         };
         var menu = BuildMenu();
-        tray.ContextMenuStrip = menu;
+        _tray.ContextMenuStrip = menu;
         _dock.ContextMenuStrip = menu;
-        tray.DoubleClick += (_, _) => _dock.ToggleUserVisible();
+        _tray.DoubleClick += (_, _) => _dock.ToggleUserVisible();
 
-        var refresh = new System.Windows.Forms.Timer { Interval = 1000 };
+        var refresh = new System.Windows.Forms.Timer { Interval = 1500 };
         refresh.Tick += (_, _) => _dock.RefreshNow();
         refresh.Start();
 
         var guard = new System.Windows.Forms.Timer { Interval = 800 };
         guard.Tick += (_, _) => _dock.FullscreenGuardTick();
         guard.Start();
+
+        // Event-driven foreground switch: update immediately when user focuses an app
+        _foregroundHookDelegate = (_, _, hwnd, _, _, _, _) =>
+        {
+            if (hwnd != IntPtr.Zero && hwnd != _dock.Handle)
+                _dock.RefreshNow(true);
+        };
+        _foregroundHook = Native.SetWinEventHook(
+            Native.EVENT_SYSTEM_FOREGROUND, Native.EVENT_SYSTEM_FOREGROUND,
+            IntPtr.Zero, _foregroundHookDelegate, 0, 0,
+            Native.WINEVENT_OUTOFCONTEXT | Native.WINEVENT_SKIPOWNPROCESS);
 
         if (_vda.Loaded)
         {
@@ -99,15 +114,40 @@ internal static class Program
                 "i3wsb", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
-        Application.ApplicationExit += (_, _) =>
-        {
-            tray.Visible = false;
-            appIcon.Dispose();
-            _hook.Dispose();
-            _dock.ReleaseAppBar();
-        };
+        Application.ApplicationExit += (_, _) => ExitApplication();
 
         Application.Run();
+    }
+
+    public static void ExitApplication()
+    {
+        try
+        {
+            if (_foregroundHook != IntPtr.Zero)
+            {
+                Native.UnhookWinEvent(_foregroundHook);
+                _foregroundHook = IntPtr.Zero;
+            }
+        }
+        catch { }
+
+        try { _hook?.Dispose(); } catch { }
+        try { _dock?.ReleaseAppBar(); } catch { }
+        try { _dock?.Dispose(); } catch { }
+        try
+        {
+            if (_tray != null)
+            {
+                _tray.Visible = false;
+                _tray.Dispose();
+                _tray = null;
+            }
+        }
+        catch { }
+        try { _appIcon?.Dispose(); } catch { }
+
+        try { Application.Exit(); } catch { }
+        Environment.Exit(0);
     }
 
     static ContextMenuStrip BuildMenu()
@@ -202,7 +242,7 @@ internal static class Program
         menu.Items.Add(miFlashing);
 
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Exit", null, (_, _) => Application.Exit());
+        menu.Items.Add("Exit", null, (_, _) => ExitApplication());
         return menu;
     }
 

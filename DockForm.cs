@@ -65,7 +65,7 @@ internal sealed class DockForm : Form
 
     readonly List<HitTarget> _hitTargets = new();
     int _hoverIndex = -1;
-    string _lastSig = "";
+    int _lastHash;
 
     DockView _view = DockView.Bar;
     bool _anchorEdge = true;
@@ -194,7 +194,11 @@ internal sealed class DockForm : Form
 
         if (AutoPrune && _vda.CanRemove)
         {
-            var occupied = new HashSet<int>(buckets.Where(kv => kv.Value.Count > 0).Select(kv => kv.Key));
+            var occupied = new HashSet<int>();
+            foreach (var kv in buckets)
+            {
+                if (kv.Value.Count > 0) occupied.Add(kv.Key);
+            }
             _vda.PruneTrailingEmptyDesktops(occupied);
             vdaCount = _vda.DesktopCount;
         }
@@ -207,15 +211,28 @@ internal sealed class DockForm : Form
         if (root != IntPtr.Zero) fg = root;
         string fgTitle = (fg != IntPtr.Zero && fg != Handle) ? Native.GetTitle(fg) : "";
 
-        string sig = $"B|{current}|{displayCount}|{_view}|{fg}|" + string.Join(",",
-            buckets.OrderBy(kv => kv.Key).Select(kv => kv.Key + ":" + string.Join(".", kv.Value.Select(w => w.Hwnd))));
+        // Fast zero-allocation change detection
+        var hc = new HashCode();
+        hc.Add(current);
+        hc.Add(displayCount);
+        hc.Add((int)_view);
+        hc.Add(fg);
+        hc.Add(fgTitle);
+        foreach (var (desktop, list) in buckets)
+        {
+            hc.Add(desktop);
+            hc.Add(list.Count);
+            for (int i = 0; i < list.Count; i++)
+                hc.Add(list[i].Hwnd);
+        }
+        int hash = hc.ToHashCode();
 
-        if (!force && sig == _lastSig)
+        if (!force && hash == _lastHash)
         {
             Invalidate();
             return;
         }
-        _lastSig = sig;
+        _lastHash = hash;
 
         _hitTargets.Clear();
 

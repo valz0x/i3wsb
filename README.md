@@ -1,8 +1,6 @@
 # i3wsb — an i3-style workspace bar for Windows
 
-[![build](https://github.com/torrex-v/i3wsb/actions/workflows/build.yml/badge.svg)](https://github.com/torrex-v/i3wsb/actions/workflows/build.yml)
-[![latest release](https://img.shields.io/github/v/release/torrex-v/i3wsb?sort=semver)](https://github.com/torrex-v/i3wsb/releases/latest)
-&nbsp;·&nbsp; Windows 11 &nbsp;·&nbsp; .NET 10 &nbsp;·&nbsp; MIT
+Windows 11 &nbsp;·&nbsp; .NET 10 &nbsp;·&nbsp; MIT
 
 A lightweight always-on-top bar for Windows 11 that shows your virtual desktops, open windows, active window title, and system status widgets (CPU, RAM, volume, battery, clock).
 

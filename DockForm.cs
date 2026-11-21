@@ -168,6 +168,7 @@ internal sealed class DockForm : Form
     public void RefreshNow(bool force = false)
     {
         if (!_vda.Loaded) return;
+        if (_userHidden || _hiddenByFullscreen) return;
         RefreshBar(force);
     }
 
@@ -219,9 +220,9 @@ internal sealed class DockForm : Form
         _hitTargets.Clear();
 
         using var g = CreateGraphics();
+        
         int pillH = BarHeight - (PillMarginY * 2);
         int curX = Pad;
-
         // 1. Workspace number pills (Left side) - always visible in all views
         for (int d = 0; d < displayCount; d++)
         {
@@ -313,11 +314,19 @@ internal sealed class DockForm : Form
 
     void ApplyGeometry(int contentW, int contentH, bool rounded)
     {
+        bool shouldShow = !_userHidden && !_hiddenByFullscreen;
         if (_anchorEdge)
         {
             Region = null;
-            _appBar ??= new AppBar(Handle);
-            _appBar.EnsureRegistered(contentH, _edge);
+            if (shouldShow)
+            {
+                _appBar ??= new AppBar(Handle);
+                _appBar.EnsureRegistered(contentH, _edge);
+            }
+            else
+            {
+                _appBar?.Unregister();
+            }
         }
         else
         {
@@ -740,7 +749,12 @@ internal sealed class DockForm : Form
     {
         if (!AutoHideOnFullscreen)
         {
-            if (_hiddenByFullscreen) { _hiddenByFullscreen = false; ApplyVisibility(); }
+            if (_hiddenByFullscreen)
+            {
+                _hiddenByFullscreen = false;
+                ApplyVisibility();
+                RefreshNow(true);
+            }
             return;
         }
         bool fs = FullscreenDetector.ForegroundIsFullscreen(Handle);
@@ -748,19 +762,29 @@ internal sealed class DockForm : Form
         {
             _hiddenByFullscreen = fs;
             ApplyVisibility();
+            if (!_hiddenByFullscreen) RefreshNow(true);
         }
     }
 
     void ApplyVisibility()
     {
         bool shouldShow = !_userHidden && !_hiddenByFullscreen;
-        if (shouldShow && !Visible) Show();
-        else if (!shouldShow && Visible) Hide();
-
-        if (_anchorEdge && _appBar != null)
+        if (shouldShow)
         {
-            if (shouldShow) _appBar.EnsureRegistered(Height, _edge);
-            else _appBar.Unregister();
+            if (!Visible) Show();
+            if (_anchorEdge)
+            {
+                _appBar ??= new AppBar(Handle);
+                _appBar.EnsureRegistered(BarHeight, _edge);
+            }
+        }
+        else
+        {
+            if (_anchorEdge && _appBar != null)
+            {
+                _appBar.Unregister();
+            }
+            if (Visible) Hide();
         }
     }
 
